@@ -28,4 +28,6 @@ func TestNeckAvoidance(t *testing.T) {
 	}
 }
 
-// TODO: More GameState test cases!
+// TODO: write tests for walls avoidance
+func TestWallsAvoidance(t *testing.T) {
+}
