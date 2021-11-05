@@ -39,6 +39,23 @@ func end(state GameState) {
 	log.Printf("%s END\n\n", state.Game.ID)
 }
 
+func getNextCoord(currCoord Coord, move string) Coord {
+	nextCoord := currCoord
+
+	switch move {
+	case "left":
+		nextCoord.X -= 1
+	case "right":
+		nextCoord.X += 1
+	case "down":
+		nextCoord.Y -= 1
+	case "up":
+		nextCoord.Y += 1
+	}
+
+	return nextCoord
+}
+
 // This function is called on every turn of a game. Use the provided GameState to decide
 // where to move -- valid moves are "up", "down", "left", or "right".
 // We've provided some code and comments to get you started.
@@ -51,8 +68,22 @@ func move(state GameState) BattlesnakeMoveResponse {
 	}
 
 	// Step 0: Don't let your Battlesnake move back in on it's own neck
-	myHead := state.You.Body[0] // Coordinates of your head
-	myNeck := state.You.Body[1] // Coordinates of body piece directly behind your head (your "neck")
+	mybody := state.You.Body
+	myHead := mybody[0] // Coordinates of your head
+	myNeck := mybody[1] // Coordinates of body piece directly behind your head (your "neck")
+
+	possibleMovesOutcome := map[string]Coord{
+		"up":    {},
+		"down":  {},
+		"left":  {},
+		"right": {},
+	}
+
+	for key := range possibleMoves {
+		nextCoord := getNextCoord(myHead, key)
+		possibleMovesOutcome[key] = nextCoord
+	}
+
 	if myNeck.X < myHead.X {
 		possibleMoves["left"] = false
 	} else if myNeck.X > myHead.X {
@@ -80,7 +111,15 @@ func move(state GameState) BattlesnakeMoveResponse {
 
 	// TODO: Step 2 - Don't hit yourself.
 	// Use information in GameState to prevent your Battlesnake from colliding with itself.
-	// mybody := state.You.Body
+
+	for i := 2; i < len(mybody); i++ {
+		for key, value := range possibleMovesOutcome {
+			if mybody[i].X == value.X && mybody[i].Y == value.Y {
+				possibleMoves[key] = false
+			}
+
+		}
+	}
 
 	// TODO: Step 3 - Don't collide with others.
 	// Use information in GameState to prevent your Battlesnake from colliding with others.
