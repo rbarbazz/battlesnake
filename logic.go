@@ -7,7 +7,6 @@ package main
 
 import (
 	"log"
-	"math/rand"
 )
 
 // This function is called when you register your Battlesnake on play.battlesnake.com
@@ -39,113 +38,88 @@ func end(state GameState) {
 	log.Printf("%s END\n\n", state.Game.ID)
 }
 
-func getNextCoord(currCoord Coord, move string) Coord {
-	nextCoord := currCoord
+func getPosition(coord Coord, width int) int {
+	return coord.X + coord.Y*width
+}
 
-	switch move {
-	case "left":
-		nextCoord.X -= 1
-	case "right":
-		nextCoord.X += 1
-	case "down":
-		nextCoord.Y -= 1
-	case "up":
-		nextCoord.Y += 1
+type PositionArray struct {
+	positions [][]bool // true means the position is already taken, false means it's free
+	height    int
+	width     int
+}
+
+// This function initializes a new position array [][]bool where the default values are false
+func newPositionArray(width int, height int) *PositionArray {
+	positionArray := PositionArray{height: height, width: width}
+	positions := make([][]bool, height)
+	for i, _ := range positions {
+		positions[i] = make([]bool, width)
 	}
 
-	return nextCoord
+	positionArray.positions = positions
+
+	return &positionArray
+}
+
+// Marks the positions where a snake is located as true in the position array
+func (p PositionArray) processPositions(coords []Coord) {
+	for _, coord := range coords {
+		// The origin of the map is 0 0, starting from the bottom left
+		// Our position array starts from the top left
+		p.positions[p.height-1-coord.Y][coord.X] = true
+	}
+}
+
+// Returns a possible move based on the position array
+func (p PositionArray) findNextMove(head Coord) string {
+	convY := p.height - 1 - head.Y
+
+	// Up
+	if convY-1 > 0 && !p.positions[convY-1][head.X] {
+		return "up"
+	}
+	// Down
+	if convY+1 < p.height && !p.positions[convY+1][head.X] {
+		return "down"
+	}
+	// Left
+	if head.X-1 > 0 && !p.positions[convY][head.X-1] {
+		return "left"
+	}
+	// Right
+	if head.X+1 < p.width && !p.positions[convY][head.X+1] {
+		return "right"
+	}
+
+	// No possible move
+	return "up"
 }
 
 // This function is called on every turn of a game. Use the provided GameState to decide
 // where to move -- valid moves are "up", "down", "left", or "right".
 // We've provided some code and comments to get you started.
 func move(state GameState) BattlesnakeMoveResponse {
-	possibleMoves := map[string]bool{
-		"up":    true,
-		"down":  true,
-		"left":  true,
-		"right": true,
-	}
-
-	// Step 0: Don't let your Battlesnake move back in on it's own neck
-	mybody := state.You.Body
-	myHead := mybody[0] // Coordinates of your head
-	myNeck := mybody[1] // Coordinates of body piece directly behind your head (your "neck")
-
-	possibleMovesOutcome := map[string]Coord{
-		"up":    {},
-		"down":  {},
-		"left":  {},
-		"right": {},
-	}
-
-	for key := range possibleMoves {
-		nextCoord := getNextCoord(myHead, key)
-		possibleMovesOutcome[key] = nextCoord
-	}
-
-	if myNeck.X < myHead.X {
-		possibleMoves["left"] = false
-	} else if myNeck.X > myHead.X {
-		possibleMoves["right"] = false
-	} else if myNeck.Y < myHead.Y {
-		possibleMoves["down"] = false
-	} else if myNeck.Y > myHead.Y {
-		possibleMoves["up"] = false
-	}
-
 	// Use information in GameState to prevent your Battlesnake from moving beyond the boundaries of the board.
 	boardWidth := state.Board.Width
 	boardHeight := state.Board.Height
 
-	if myHead.X == 0 {
-		possibleMoves["left"] = false
-	} else if myHead.X == boardWidth-1 {
-		possibleMoves["right"] = false
+	positionArray := newPositionArray(boardWidth, boardHeight)
+
+	// Step 0: Don't let your Battlesnake move back in on it's own neck
+	mybody := state.You.Body
+	myHead := mybody[0] // Coordinates of your head
+
+	// Call processPositions on all the snakes including myself
+	positionArray.processPositions(state.You.Body)
+
+	for _, snake := range state.Board.Snakes {
+		positionArray.processPositions(snake.Body)
 	}
-	if myHead.Y == 0 {
-		possibleMoves["down"] = false
-	} else if myHead.Y == boardHeight-1 {
-		possibleMoves["up"] = false
-	}
-
-	// TODO: Step 2 - Don't hit yourself.
-	// Use information in GameState to prevent your Battlesnake from colliding with itself.
-
-	for i := 2; i < len(mybody); i++ {
-		for key, value := range possibleMovesOutcome {
-			if mybody[i].X == value.X && mybody[i].Y == value.Y {
-				possibleMoves[key] = false
-			}
-
-		}
-	}
-
-	// TODO: Step 3 - Don't collide with others.
-	// Use information in GameState to prevent your Battlesnake from colliding with others.
 
 	// TODO: Step 4 - Find food.
 	// Use information in GameState to seek out and find food.
 
-	// Finally, choose a move from the available safe moves.
-	// TODO: Step 5 - Select a move to make based on strategy, rather than random.
-	var nextMove string
-
-	safeMoves := []string{}
-	for move, isSafe := range possibleMoves {
-		if isSafe {
-			safeMoves = append(safeMoves, move)
-		}
-	}
-
-	if len(safeMoves) == 0 {
-		nextMove = "down"
-		log.Printf("%s MOVE %d: No safe moves detected! Moving %s\n", state.Game.ID, state.Turn, nextMove)
-	} else {
-		nextMove = safeMoves[rand.Intn(len(safeMoves))]
-		log.Printf("%s MOVE %d: %s\n", state.Game.ID, state.Turn, nextMove)
-	}
 	return BattlesnakeMoveResponse{
-		Move: nextMove,
+		Move: positionArray.findNextMove(myHead),
 	}
 }
