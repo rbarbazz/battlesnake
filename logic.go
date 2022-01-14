@@ -7,6 +7,7 @@ package main
 
 import (
 	"log"
+	"math"
 )
 
 // This function is called when you register your Battlesnake on play.battlesnake.com
@@ -72,28 +73,52 @@ func (p PositionArray) processPositions(coords []Coord) {
 
 // Returns a possible move based on the position array
 func (p PositionArray) findNextMove(head Coord) string {
-	convY := p.height - 1 - head.Y
+	flippedY := p.height - 1 - head.Y
 
 	// Up
-	if convY-1 > 0 && !p.positions[convY-1][head.X] {
+	if flippedY-1 > 0 && !p.positions[flippedY-1][head.X] {
 		return "up"
 	}
 	// Down
-	if convY+1 < p.height && !p.positions[convY+1][head.X] {
+	if flippedY+1 < p.height && !p.positions[flippedY+1][head.X] {
 		return "down"
 	}
 	// Left
-	if head.X-1 > 0 && !p.positions[convY][head.X-1] {
+	if head.X-1 > 0 && !p.positions[flippedY][head.X-1] {
 		return "left"
 	}
 	// Right
-	if head.X+1 < p.width && !p.positions[convY][head.X+1] {
+	if head.X+1 < p.width && !p.positions[flippedY][head.X+1] {
 		return "right"
 	}
 
 	// No possible move
 	return "up"
 }
+
+func identifyNearestFood(head Coord, foodList []Coord) Coord {
+	type NearestFood struct {
+		TotalDiff float64
+		FoodItem  Coord
+	}
+	nearestFood := NearestFood{}
+
+	for i, foodItem := range foodList {
+		xDiff := math.Abs(float64(foodItem.X - head.X))
+		yDiff := math.Abs(float64(foodItem.Y - head.Y))
+		totalDiff := xDiff + yDiff
+
+		if i == 0 || totalDiff < nearestFood.TotalDiff {
+			nearestFood = NearestFood{TotalDiff: totalDiff, FoodItem: foodItem}
+		}
+	}
+
+	return nearestFood.FoodItem
+}
+
+// Todo for next time:
+// Figure out if we should call identifyNearestFood before or after findNextMove
+// Possibility of having a priority list of moves that would be passed around functions that help determine the next move
 
 // This function is called on every turn of a game. Use the provided GameState to decide
 // where to move -- valid moves are "up", "down", "left", or "right".
