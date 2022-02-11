@@ -71,29 +71,39 @@ func (p PositionArray) processPositions(coords []Coord) {
 	}
 }
 
+type PotentialMove struct {
+	Move        string
+	IsAvailable bool
+}
+
 // Returns a possible move based on the position array
-func (p PositionArray) findNextMove(head Coord) string {
+func (p PositionArray) findNextMove(head Coord) [4]PotentialMove {
 	flippedY := p.height - 1 - head.Y
+	potentialMoves := [4]PotentialMove{
+		PotentialMove{Move: "up", IsAvailable: false},
+		PotentialMove{Move: "down", IsAvailable: false},
+		PotentialMove{Move: "left", IsAvailable: false},
+		PotentialMove{Move: "right", IsAvailable: false},
+	}
 
 	// Up
 	if flippedY-1 > 0 && !p.positions[flippedY-1][head.X] {
-		return "up"
+		potentialMoves[0].IsAvailable = true
 	}
 	// Down
 	if flippedY+1 < p.height && !p.positions[flippedY+1][head.X] {
-		return "down"
+		potentialMoves[1].IsAvailable = true
 	}
 	// Left
 	if head.X-1 > 0 && !p.positions[flippedY][head.X-1] {
-		return "left"
+		potentialMoves[2].IsAvailable = true
 	}
 	// Right
 	if head.X+1 < p.width && !p.positions[flippedY][head.X+1] {
-		return "right"
+		potentialMoves[3].IsAvailable = true
 	}
 
-	// No possible move
-	return "up"
+	return potentialMoves
 }
 
 func identifyNearestFood(head Coord, foodList []Coord) Coord {
@@ -114,6 +124,17 @@ func identifyNearestFood(head Coord, foodList []Coord) Coord {
 	}
 
 	return nearestFood.FoodItem
+}
+
+func getDirection(potentialMoves [4]PotentialMove, head Coord, foodItem Coord) string {
+	if foodItem.X > head.X && potentialMoves[2].IsAvailable {
+		return "left"
+	} else if foodItem.X < head.X && potentialMoves[3].IsAvailable {
+		return "right"
+	} else if foodItem.Y > head.Y && potentialMoves[0].IsAvailable {
+		return "up"
+	}
+	return "down"
 }
 
 // Todo for next time:
