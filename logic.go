@@ -6,7 +6,9 @@ package main
 // from the list of possible moves!
 
 import (
+	"errors"
 	"log"
+	"math"
 )
 
 // This function is called when you register your Battlesnake on play.battlesnake.com
@@ -70,30 +72,111 @@ func (p PositionArray) processPositions(coords []Coord) {
 	}
 }
 
+type PotentialMove struct {
+	Move        string
+	IsAvailable bool
+}
+
 // Returns a possible move based on the position array
-func (p PositionArray) findNextMove(head Coord) string {
-	convY := p.height - 1 - head.Y
+func (p PositionArray) findNextMove(head Coord) [4]PotentialMove {
+	flippedY := p.height - 1 - head.Y
+	potentialMoves := [4]PotentialMove{
+		{Move: "up", IsAvailable: false},
+		{Move: "down", IsAvailable: false},
+		{Move: "left", IsAvailable: false},
+		{Move: "right", IsAvailable: false},
+	}
 
 	// Up
-	if convY-1 > 0 && !p.positions[convY-1][head.X] {
-		return "up"
+	if flippedY-1 >= 0 && !p.positions[flippedY-1][head.X] {
+		potentialMoves[0].IsAvailable = true
 	}
 	// Down
-	if convY+1 < p.height && !p.positions[convY+1][head.X] {
-		return "down"
+	if flippedY+1 < p.height && !p.positions[flippedY+1][head.X] {
+		potentialMoves[1].IsAvailable = true
 	}
 	// Left
-	if head.X-1 > 0 && !p.positions[convY][head.X-1] {
-		return "left"
+	if head.X-1 >= 0 && !p.positions[flippedY][head.X-1] {
+		potentialMoves[2].IsAvailable = true
 	}
 	// Right
-	if head.X+1 < p.width && !p.positions[convY][head.X+1] {
-		return "right"
+	if head.X+1 < p.width && !p.positions[flippedY][head.X+1] {
+		potentialMoves[3].IsAvailable = true
 	}
 
-	// No possible move
-	return "up"
+	return potentialMoves
 }
+
+func identifyNearestFood(head Coord, foodList []Coord) Coord {
+	type NearestFood struct {
+		TotalDiff float64
+		FoodItem  Coord
+	}
+	nearestFood := NearestFood{}
+
+	for i, foodItem := range foodList {
+		xDiff := math.Abs(float64(foodItem.X - head.X))
+		yDiff := math.Abs(float64(foodItem.Y - head.Y))
+		totalDiff := xDiff + yDiff
+
+		if i == 0 || totalDiff < nearestFood.TotalDiff {
+			nearestFood = NearestFood{TotalDiff: totalDiff, FoodItem: foodItem}
+		}
+	}
+
+	return nearestFood.FoodItem
+}
+
+func getFoodDirection(potentialMoves [4]PotentialMove, head Coord, foodItem Coord) (string, error) {
+	if foodItem.X > head.X && potentialMoves[3].IsAvailable {
+		return "right", nil
+	} else if foodItem.X < head.X && potentialMoves[2].IsAvailable {
+		return "left", nil
+	} else if foodItem.Y > head.Y && potentialMoves[0].IsAvailable {
+		return "up", nil
+	} else if foodItem.Y < head.Y && potentialMoves[1].IsAvailable {
+		return "down", nil
+	}
+	return "", errors.New("NO_FOOD_DIRECTION")
+}
+
+func getAvailableDirection(potentialMoves [4]PotentialMove, head Coord, boardWidth int, boardHeight int) (string, error) {
+	availableMoves := []string{}
+
+	if boardWidth/2 > head.X && potentialMoves[3].IsAvailable {
+		availableMoves = append(availableMoves, "right")
+	} else if boardWidth/2 < head.X && potentialMoves[2].IsAvailable {
+		availableMoves = append(availableMoves, "left")
+	} else if boardHeight/2 > head.Y && potentialMoves[0].IsAvailable {
+		availableMoves = append(availableMoves, "up")
+	} else if boardHeight/2 < head.Y && potentialMoves[1].IsAvailable {
+		availableMoves = append(availableMoves, "down")
+	}
+
+	if len(availableMoves) > 0 {
+		return availableMoves[0], nil
+	}
+
+	if potentialMoves[3].IsAvailable {
+		availableMoves = append(availableMoves, "right")
+	} else if potentialMoves[2].IsAvailable {
+		availableMoves = append(availableMoves, "left")
+	} else if potentialMoves[0].IsAvailable {
+		availableMoves = append(availableMoves, "up")
+	} else if potentialMoves[1].IsAvailable {
+		availableMoves = append(availableMoves, "down")
+	}
+
+	if len(availableMoves) > 0 {
+		return availableMoves[0], nil
+	}
+
+	return "", errors.New("NO_AVAILABLE_DIRECTION")
+}
+
+// Todo for next time:
+// Figure out if we should call identifyNearestFood before or after findNextMove
+// Possibility of having a priority list of moves that would be passed around functions that help determine the next move
 
 // This function is called on every turn of a game. Use the provided GameState to decide
 // where to move -- valid moves are "up", "down", "left", or "right".
@@ -118,8 +201,19 @@ func move(state GameState) BattlesnakeMoveResponse {
 
 	// TODO: Step 4 - Find food.
 	// Use information in GameState to seek out and find food.
+	potentialMoves := positionArray.findNextMove(myHead)
+	nearestFood := identifyNearestFood(myHead, state.Board.Food)
+	direction, err := getFoodDirection(potentialMoves, myHead, nearestFood)
+
+	if err != nil {
+		direction, err = getAvailableDirection(potentialMoves, myHead, boardWidth, boardHeight)
+
+		if err != nil {
+			println(err.Error())
+		}
+	}
 
 	return BattlesnakeMoveResponse{
-		Move: positionArray.findNextMove(myHead),
+		Move: direction,
 	}
 }
